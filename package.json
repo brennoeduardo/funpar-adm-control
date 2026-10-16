@@ -1,0 +1,36 @@
+{
+  "name": "funpar-adm-control",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Painel de consulta de fornecedores, contratos e pagamentos ADM da FUNPAR, alimentado pelos relatórios do Protheus.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build && npm run build:gerador",
+    "build:gerador": "esbuild scripts/gerador.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/gerador.mjs",
+    "gerar": "tsx scripts/gerador.ts",
+    "gerar:dev": "tsx scripts/gerador.ts --config config.dev.json",
+    "migrar": "tsx scripts/migrar-base.ts",
+    "publicar": "tsx scripts/publicar.ts",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "vue": "3.5.44",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "4.3.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "24.19.2",
+    "@vitejs/plugin-vue": "6.0.10",
+    "esbuild": "0.28.2",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "vite-plugin-singlefile": "2.3.3",
+    "vitest": "5.0.4",
+    "vue-tsc": "3.3.13"
+  }
+}

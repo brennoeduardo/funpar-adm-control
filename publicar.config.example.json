@@ -1,0 +1,9 @@
+{
+  "servidor": "SERVIDOR-SQL",
+  "banco": "NOME_DO_BANCO",
+  "views": {
+    "pagamentos": "dbo.VIEW_CONTAS_A_PAGAR",
+    "solicitacoes": "dbo.VIEW_SOLICITACOES_ABERTAS",
+    "contratos": "dbo.VIEW_CONTRATOS"
+  }
+}

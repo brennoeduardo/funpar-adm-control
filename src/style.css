@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* Identidade visual do site da FUNPAR (funpar.ufpr.br): azul institucional, marinho, amarelo de destaque. */
+@theme {
+  --font-sans: "Urbanist", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-titulo: "Merriweather", Georgia, "Times New Roman", serif;
+
+  --color-marca-50: #eef4fb;
+  --color-marca-100: #d9e6f5;
+  --color-marca-200: #b3cceb;
+  --color-marca-500: #003c82; /* títulos */
+  --color-marca-600: #004087; /* azul institucional */
+  --color-marca-700: #002547; /* texto escuro */
+  --color-marca-800: #001753; /* marinho */
+  --color-marca-900: #00102c; /* marinho profundo */
+
+  --color-destaque: #f9d643; /* amarelo dos botões do site */
+  --color-destaque-claro: #fef7d6;
+  --color-fundo: #f4f4f4;
+  --color-texto-suave: #54595f;
+}
+
+/* Cores das situações: usadas na matriz, nos selos e na legenda */
+:root {
+  --s-pago: #3f7512; /* verde do site (#519318), escurecido para leitura */
+  --s-pago-bg: #e8f3dc;
+  --s-lancado: #004087; /* azul institucional: lançado, aguardando pagamento */
+  --s-lancado-bg: #dce8f7;
+  --s-naolancado: #78350f; /* âmbar do site (#f59e0b): falta lançar */
+  --s-naolancado-bg: #fdecc8;
+  --s-vencido: #9f1239;
+  --s-vencido-bg: #fde2e8;
+  --s-sem: #54595f;
+  --s-sem-bg: #eceef0;
+  --s-fora: #7a8594;
+  --s-fora-bg: #f4f4f4;
+  --s-nao: #b8c0cc;
+  --s-nao-bg: transparent;
+}
+
+body {
+  @apply bg-fundo font-sans text-marca-700 antialiased;
+}
+
+h1,
+h2,
+h3 {
+  @apply font-titulo text-marca-500;
+}
+
+.cartao {
+  @apply rounded-xl border border-slate-200/80 bg-white shadow-sm;
+}
+
+.rotulo {
+  @apply font-sans text-xs font-semibold uppercase tracking-wide text-texto-suave;
+}
+
+.campo {
+  @apply rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-sm text-marca-700 shadow-sm focus:border-marca-600 focus:ring-2 focus:ring-marca-600/30 focus:outline-none;
+}
+
+.botao {
+  @apply inline-flex items-center gap-1.5 rounded-full border border-marca-600 bg-white px-4 py-1.5 text-sm font-semibold text-marca-600 shadow-sm transition hover:bg-marca-50 disabled:opacity-50;
+}
+
+.botao-primario {
+  @apply inline-flex items-center gap-1.5 rounded-full bg-destaque px-4 py-1.5 text-sm font-bold text-marca-700 shadow-sm transition hover:brightness-95 disabled:opacity-50;
+}
+
+.tabela {
+  @apply w-full text-sm;
+}
+.tabela th {
+  @apply sticky top-0 z-10 border-b border-marca-100 bg-marca-50 px-3 py-2 text-left font-sans text-xs font-bold uppercase tracking-wide text-marca-600;
+}
+.tabela td {
+  @apply border-b border-slate-100 px-3 py-2 align-top;
+}
+.tabela tbody tr:hover td {
+  @apply bg-destaque-claro;
+}
+
+.num {
+  @apply text-right tabular-nums whitespace-nowrap;
+}

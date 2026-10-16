@@ -1,0 +1,6 @@
+{
+  "pastaRelatorios": "dev/relatorios",
+  "cadastros": "dev/cadastros.xlsx",
+  "saida": "public/dados/gerado",
+  "segundosMinimosDesdeAlteracao": 0
+}

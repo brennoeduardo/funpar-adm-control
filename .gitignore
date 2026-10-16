@@ -1,0 +1,20 @@
+# Dependências e builds
+node_modules/
+dist/
+*.tmp
+
+# Dados reais (relatórios, cadastros, dados gerados) — nunca versionar
+dev/
+public/dados/
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+estado*.json
+*.log
+
+# Configuração da rede interna (servidor, banco, views). Modelo: publicar.config.example.json
+publicar.config.json
+
+# Ferramentas locais
+.claude/

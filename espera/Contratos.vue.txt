@@ -1,0 +1,69 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { fornecedorDoContrato } from '@core/conciliacao'
+import { numeroCurto, ROTULO_VIGENCIA, type Vigencia } from '@core/situacao'
+import { dados, detalhe, filtros, vigencias } from '../estado'
+import { contemTexto, data, moeda } from '../formato'
+import VigenciaSelo from '../componentes/VigenciaSelo.vue'
+
+const vigencia = ref<Vigencia | ''>('')
+
+const linhas = computed(() => {
+  const d = dados.value!
+  return d.contratos
+    .map((c) => {
+      const f = fornecedorDoContrato(d.fornecedores, c)
+      const pagos = d.titulos.filter((t) => t.contrato === c.numero && t.baixa)
+      const ultimos = pagos.sort((a, b) => (b.competencia ?? '').localeCompare(a.competencia ?? '')).slice(0, 3)
+      const media = ultimos.length ? ultimos.reduce((s, t) => s + t.valor, 0) / ultimos.length : null
+      return { c, f, v: vigencias.value.get(c.numero)!, media, qtd: pagos.length }
+    })
+    .filter((x) => !filtros.tipo || x.c.tipo === filtros.tipo)
+    .filter((x) => !vigencia.value || x.v.vigencia === vigencia.value)
+    .filter((x) => contemTexto([x.c.numero, x.c.objeto, x.c.processo, x.f?.nome, x.f?.razaoSocial, x.c.produto], filtros.busca))
+    .sort((a, b) => (a.c.dataFim ?? '9999').localeCompare(b.c.dataFim ?? '9999'))
+})
+</script>
+
+<template>
+  <div class="space-y-4">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <label class="flex flex-col gap-1">
+        <span class="rotulo">Vigência</span>
+        <select v-model="vigencia" class="campo">
+          <option value="">Todas</option>
+          <option v-for="(r, k) in ROTULO_VIGENCIA" :key="k" :value="k">{{ r }}</option>
+        </select>
+      </label>
+      <span class="text-sm text-texto-suave">{{ linhas.length }} contratos · ordenados pelo fim da vigência</span>
+    </div>
+    <div class="cartao overflow-auto" style="max-height: calc(100vh - 260px)">
+      <table class="tabela">
+        <thead>
+          <tr>
+            <th>Contrato</th><th>Fornecedor</th><th>Objeto</th><th>Tipo</th><th>Period.</th><th>Venc.</th>
+            <th>Início</th><th>Fim</th><th>Vigência</th><th class="num">Referência</th><th class="num">Média paga*</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="x in linhas" :key="x.c.numero" class="cursor-pointer" :class="x.c.ativo ? '' : 'opacity-50'" @click="detalhe = { tipo: 'contrato', numero: x.c.numero }">
+            <td class="font-medium tabular-nums whitespace-nowrap">{{ numeroCurto(x.c.numero) }}</td>
+            <td class="whitespace-nowrap">{{ x.f?.nome ?? x.c.codFornecedor }}</td>
+            <td class="max-w-96"><div class="line-clamp-2 text-xs text-texto-suave" :title="x.c.objeto ?? ''">{{ x.c.objeto ?? '—' }}</div></td>
+            <td class="text-xs">{{ x.c.tipo ?? '—' }}</td>
+            <td class="text-xs">{{ x.c.periodicidade }}</td>
+            <td class="text-xs">{{ x.c.diaVencimento ?? x.c.vencimentoTexto ?? '—' }}</td>
+            <td class="tabular-nums">{{ data(x.c.dataInicio) }}</td>
+            <td class="tabular-nums">{{ data(x.c.dataFim) }}</td>
+            <td><VigenciaSelo :vigencia="x.v.vigencia" :dias="x.v.dias" /></td>
+            <td class="num">{{ moeda(x.c.valorReferencia) }}</td>
+            <td class="num" :class="x.media && x.c.valorReferencia && Math.abs(x.media - x.c.valorReferencia) / x.c.valorReferencia > x.c.toleranciaPct / 100 ? 'text-amber-700 font-medium' : ''">
+              {{ x.media === null ? '—' : moeda(x.media) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-texto-suave">* Média dos últimos 3 pagamentos vinculados ao contrato nos relatórios importados. Em destaque quando foge da tolerância.</p>
+  </div>
+</template>
