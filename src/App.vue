@@ -11,9 +11,10 @@ import Fornecedores from './paginas/Fornecedores.vue'
 import Importacoes from './paginas/Importacoes.vue'
 import Solicitacoes from './paginas/Solicitacoes.vue'
 import ContratosProtheus from './paginas/ContratosProtheus.vue'
+import OrdensFornecimento from './paginas/OrdensFornecimento.vue'
 import { ORIGEM_ATAS, ORIGEM_COMPRAS } from '@core/solicitacoes'
 
-const componentes = { painel: Painel, mensal: VisaoMensal, pagamentos: Pagamentos, contratos: ContratosProtheus, fornecedores: Fornecedores, importacoes: Importacoes }
+const componentes = { painel: Painel, mensal: VisaoMensal, pagamentos: Pagamentos, contratos: ContratosProtheus, of: OrdensFornecimento, fornecedores: Fornecedores, importacoes: Importacoes }
 const ehSolicitacao = computed(() => !!dados.value && (pagina.value === 'atas' || pagina.value === 'compras'))
 const atual = computed(() => (!dados.value ? Importacoes : pagina.value === 'atas' || pagina.value === 'compras' ? null : componentes[pagina.value]))
 
@@ -82,7 +83,7 @@ const grupos = computed(() => {
 })
 const tituloPagina = computed(() => PAGINAS.find((p) => p.id === pagina.value)?.titulo ?? '')
 
-const comFiltros = computed(() => ['painel', 'mensal', 'pagamentos', 'atas', 'compras', 'contratos', 'fornecedores'].includes(pagina.value))
+const comFiltros = computed(() => ['painel', 'mensal', 'pagamentos', 'atas', 'compras', 'of', 'contratos', 'fornecedores'].includes(pagina.value))
 </script>
 
 <template>

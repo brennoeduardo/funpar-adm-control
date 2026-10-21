@@ -176,6 +176,34 @@ export interface Solicitacao {
   descContaContabil: string | null
 }
 
+/** Item de Ordem de Fornecimento aberta (view de OFs). Uma OF pode ter vários itens. */
+export interface ItemOF {
+  /** Nº da OF; null quando a solicitação ainda está em aprovação e a OF não foi emitida */
+  pedido: string | null
+  /** 'ATAS E CONTRATOS' ou 'FORMULÁRIO DE COMPRAS' */
+  origem: string
+  solicitante: string | null
+  fornecedor: string
+  /** Código do fornecedor: pelo contrato (view de contratos) ou pelo nome no cadastro ADM */
+  codFornecedor: string | null
+  dataSolicitacao: string | null
+  emissao: string | null
+  processo: string | null
+  contrato: string | null
+  modalidade: string | null
+  /** Mesmo protocolo da solicitação que originou a OF */
+  protocolo: string | null
+  descricao: string | null
+  qtdSolicitada: number
+  qtdEntregue: number
+  valorUnitario: number
+  valorTotal: number
+  status: string
+  centroCusto: string | null
+  contaContabil: string | null
+  descContaContabil: string | null
+}
+
 /** Resumo dos pagamentos de um fornecedor (todos os títulos do Contas a Pagar, não só os do escopo ADM). */
 export interface ResumoPagamentos {
   /** Total baixado no ano corrente */
@@ -233,4 +261,9 @@ export interface DadosADM {
   /** Contratos vigentes do Protheus; retrato da última extração */
   contratosProtheus?: ContratoProtheus[]
   contratosGeradoEm?: string | null
+  /** Itens de Ordens de Fornecimento abertas; retrato da última extração */
+  ofs?: ItemOF[]
+  ofsGeradoEm?: string | null
+  /** Quantidade de OFs ocultadas por configuração (ofs.ocultarFornecedores) */
+  ofsOcultas?: number
 }

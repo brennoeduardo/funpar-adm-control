@@ -53,7 +53,7 @@ function nomeComparavel(nome: string): string {
  * A view não traz código nem CNPJ do fornecedor: liga ao cadastro ADM pelo nome
  * (razão social ou nome de exibição, ignorando prefixos de CNPJ e sufixos como LTDA).
  */
-export function vincularFornecedores(itens: Solicitacao[], fornecedores: Fornecedor[]): Solicitacao[] {
+export function vincularFornecedores<T extends { fornecedor: string }>(itens: T[], fornecedores: Fornecedor[]): (T & { codFornecedor: string | null })[] {
   const indice = new Map<string, string>()
   for (const f of fornecedores) {
     for (const n of [f.razaoSocial, f.nome]) {

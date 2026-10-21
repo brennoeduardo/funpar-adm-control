@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { DESCRICAO_SITUACAO, montarMatriz, situacaoDosTitulos } from '@core/situacao'
 import type { TituloVinculado } from '@core/tipos'
-import { dados, detalhe, hoje } from '../estado'
+import { dados, detalhe, hoje, ofsParaSinalizar } from '../estado'
 import { cnpj, compCurta, compLonga, data, dataHora, moeda } from '../formato'
 import SituacaoSelo from './SituacaoSelo.vue'
 
@@ -22,6 +22,12 @@ const celula = computed(() => {
   if (x?.tipo !== 'celula') return undefined
   const linha = montarMatriz(d.value, [x.competencia], hoje).find((l) => l.id === x.linhaId)
   return linha ? { linha, competencia: x.competencia, c: linha.celulas[x.competencia]! } : undefined
+})
+
+/** OFs abertas do fornecedor para a competência da célula, quando a nota ainda não foi lançada. */
+const ofsCelula = computed(() => {
+  const c = celula.value
+  return c ? ofsParaSinalizar(c.linha.fornecedor.codigo, c.competencia, c.c.situacao) : []
 })
 
 const fornecedor = computed(() => {
@@ -142,6 +148,24 @@ const abrirTitulo = (t: TituloVinculado) => (detalhe.value = { tipo: 'titulo', c
           <div class="flex flex-wrap items-center gap-2">
             <SituacaoSelo :situacao="celula.c.situacao" />
             <span class="text-texto-suave">{{ DESCRICAO_SITUACAO[celula.c.situacao] }}</span>
+          </div>
+          <div v-if="ofsCelula.length" class="rounded-lg border border-destaque bg-destaque-claro p-3">
+            <div class="flex items-center gap-2 font-bold text-marca-700">
+              <span class="rounded-full bg-destaque px-2 py-0.5 text-xs font-extrabold">OF</span>
+              A nota ainda não foi lançada, mas já existe Ordem de Fornecimento aberta
+            </div>
+            <table class="mt-2 w-full text-xs">
+              <thead><tr class="text-left text-texto-suave"><th class="py-1">OF</th><th class="py-1">Emissão</th><th class="py-1">Situação</th><th class="py-1">Item</th><th class="py-1 text-right">Valor</th></tr></thead>
+              <tbody>
+                <tr v-for="o in ofsCelula" :key="o.pedido" class="border-t border-destaque/50">
+                  <td class="py-1 font-semibold tabular-nums">{{ o.pedido }}</td>
+                  <td class="py-1 tabular-nums">{{ data(o.emissao) }}</td>
+                  <td class="py-1">{{ o.status.charAt(0) + o.status.slice(1).toLowerCase() }}</td>
+                  <td class="py-1">{{ o.descricao ?? '—' }}</td>
+                  <td class="py-1 text-right tabular-nums">{{ moeda(o.valor) }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
           <div>
             <h3 class="mb-2 text-base font-bold">Títulos na competência</h3>

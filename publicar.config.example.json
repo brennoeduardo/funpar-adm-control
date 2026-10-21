@@ -4,6 +4,7 @@
   "views": {
     "pagamentos": "dbo.VIEW_CONTAS_A_PAGAR",
     "solicitacoes": "dbo.VIEW_SOLICITACOES_ABERTAS",
-    "contratos": "dbo.VIEW_CONTRATOS"
+    "contratos": "dbo.VIEW_CONTRATOS",
+    "ofs": "dbo.VIEW_OFS_ABERTAS"
   }
 }

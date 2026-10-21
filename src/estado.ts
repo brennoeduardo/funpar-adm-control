@@ -1,6 +1,7 @@
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import { conciliar, importarRelatorios, lerCadastros, type ArquivoRelatorio, type Cadastros, type DadosADM, type Titulo, type TituloVinculado } from '@core/index'
-import { competenciaCoberta, montarMatriz, type LinhaMatriz } from '@core/situacao'
+import { competenciaCoberta, montarMatriz, type LinhaMatriz, type Situacao } from '@core/situacao'
+import { ofsAbertasPorFornecedor, ofsDaCompetencia, type OFAberta } from '@core/ofs'
 import { competenciaDe, hojeISO, somarMeses } from '@core/util'
 import { contemTexto } from './formato'
 
@@ -22,13 +23,14 @@ export const PAGINAS = [
   { id: 'pagamentos', titulo: 'Lançamentos', grupo: 'Acompanhamento' },
   { id: 'atas', titulo: 'Atas/Contratos', grupo: 'Solicitações' },
   { id: 'compras', titulo: 'Compras', grupo: 'Solicitações' },
+  { id: 'of', titulo: 'Ordens de Fornecimento', grupo: 'Solicitações' },
   { id: 'contratos', titulo: 'Contratos', grupo: 'Cadastro' },
   { id: 'fornecedores', titulo: 'Fornecedores', grupo: 'Cadastro' },
   { id: 'importacoes', titulo: 'Importações', grupo: 'Sistema' },
 ] as const
 
 /** Itens do menu que ainda não existem (aparecem como "em breve"). */
-export const EM_BREVE = [{ id: 'of', titulo: 'Ordens de Fornecimento', grupo: 'Solicitações' }] as const
+export const EM_BREVE: { id: string; titulo: string; grupo: string }[] = []
 export type PaginaId = (typeof PAGINAS)[number]['id']
 
 function paginaDoHash(): PaginaId {
@@ -150,6 +152,21 @@ export const matrizAno = computed(() => {
   return montarMatriz(d, comps, hoje)
 })
 
+/** OFs abertas (emitidas, não finalizadas) por código de fornecedor. */
+export const ofsAbertas = computed(() => ofsAbertasPorFornecedor(dados.value?.ofs ?? []))
+
+/** Situações em que vale avisar "já tem OF": a nota ainda não foi lançada. */
+const PENDENTE_DE_NF: Situacao[] = ['nao_lancado', 'sem_registro', 'fora_cobertura']
+
+/**
+ * OFs abertas de um fornecedor que valem para a competência, só quando a célula ainda está sem lançamento.
+ * Ponto único para evoluir o selo: OF → NF recebida (view de notas importadas) → pronto para lançar.
+ */
+export function ofsParaSinalizar(codFornecedor: string, competencia: string, situacao: Situacao): OFAberta[] {
+  if (!PENDENTE_DE_NF.includes(situacao)) return []
+  return ofsDaCompetencia(ofsAbertas.value.get(codFornecedor), competencia)
+}
+
 export const somenteBaixados = computed(() => {
   const cob = dados.value?.coberturas ?? []
   return cob.length > 0 && !cob.some((c) => c.tipo !== 'baixados')
@@ -212,6 +229,9 @@ export async function importarManual(arquivos: File[]): Promise<ResumoImportacao
   novo.solicitacoesGeradoEm = atual?.solicitacoesGeradoEm ?? null
   novo.contratosProtheus = atual?.contratosProtheus
   novo.contratosGeradoEm = atual?.contratosGeradoEm ?? null
+  novo.ofs = atual?.ofs
+  novo.ofsGeradoEm = atual?.ofsGeradoEm ?? null
+  novo.ofsOcultas = atual?.ofsOcultas
   dados.value = novo
   return {
     cadastros: nomeCadastros,

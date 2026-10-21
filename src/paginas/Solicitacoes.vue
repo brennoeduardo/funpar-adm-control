@@ -4,11 +4,16 @@ import * as XLSX from 'xlsx'
 import type { Solicitacao } from '@core/tipos'
 import { dados, filtros, fornecedorPorCodigo, hoje } from '../estado'
 import { contemTexto, data, dataHora, moeda } from '../formato'
+import { nomeParaOrdenar, noPeriodo, useOrdenacao } from '../componentes/ordenacao'
+import FiltroPeriodo from '../componentes/FiltroPeriodo.vue'
 
 const props = defineProps<{ origem: string; titulo: string; descricao: string }>()
 
 const status = ref('')
 const soAdm = ref(false)
+/** Período pela data da solicitação */
+const de = ref('')
+const ate = ref('')
 const aberto = ref<Set<string>>(new Set())
 watch(() => props.origem, () => {
   status.value = ''
@@ -16,6 +21,18 @@ watch(() => props.origem, () => {
 })
 
 const itens = computed(() => (dados.value?.solicitacoes ?? []).filter((s) => s.origem === props.origem))
+
+/** OFs geradas a partir de cada solicitação (mesmo protocolo). */
+const ofsPorProtocolo = computed(() => {
+  const m = new Map<string, string[]>()
+  for (const o of dados.value?.ofs ?? []) {
+    if (!o.protocolo || !o.pedido) continue
+    const l = m.get(o.protocolo) ?? []
+    if (!l.includes(o.pedido)) l.push(o.pedido)
+    m.set(o.protocolo, l)
+  }
+  return m
+})
 
 /** Agrupa os itens por solicitação (protocolo) e fornecedor. */
 interface Grupo {
@@ -41,7 +58,7 @@ const grupos = computed<Grupo[]>(() => {
     if (s.data && (!g.data || s.data < g.data)) g.data = s.data
     m.set(id, g)
   }
-  return [...m.values()].sort((a, b) => (b.data ?? '').localeCompare(a.data ?? '') || a.fornecedor.localeCompare(b.fornecedor, 'pt-BR'))
+  return [...m.values()].filter((g) => noPeriodo(g.data, de.value, ate.value))
 })
 
 const resumo = computed(() => {
@@ -55,7 +72,15 @@ const resumo = computed(() => {
   return [...m.values()].sort((a, b) => b.qtd - a.qtd)
 })
 
-const linhas = computed(() =>
+type Coluna = 'data' | 'protocolo' | 'fornecedor' | 'solicitante' | 'valor' | 'status' | 'centro'
+const { ordenar, seta, aplicar } = useOrdenacao<Grupo, Coluna>(
+  (g, c) => (c === 'centro' ? g.centrosCusto[0] : c === 'protocolo' ? Number(g.protocolo) || g.protocolo : c === 'fornecedor' ? nomeParaOrdenar(g.fornecedor) : g[c]),
+  'data',
+  true,
+)
+
+const linhas = computed(() => aplicar(filtradas.value))
+const filtradas = computed(() =>
   grupos.value.filter((g) => {
     if (status.value && g.status !== status.value) return false
     if (soAdm.value && !g.codFornecedor) return false
@@ -150,6 +175,7 @@ function exportar() {
       </div>
 
       <div class="flex flex-wrap items-center justify-between gap-3">
+        <FiltroPeriodo v-model:de="de" v-model:ate="ate" rotulo="Data da solicitação" />
         <label class="flex items-center gap-2 text-sm">
           <input v-model="soAdm" type="checkbox" class="size-4 accent-marca-600" /> Só fornecedores do cadastro ADM
         </label>
@@ -161,7 +187,14 @@ function exportar() {
           <thead>
             <tr>
               <th class="w-6"></th>
-              <th>Data</th><th>Protocolo</th><th>Fornecedor</th><th>Solicitante</th><th>Itens</th><th class="num">Valor</th><th>Situação</th><th>Centro de custo</th>
+              <th class="cursor-pointer select-none" @click="ordenar('data')">Data{{ seta('data') }}</th>
+              <th class="cursor-pointer select-none" @click="ordenar('protocolo')">Protocolo{{ seta('protocolo') }}</th>
+              <th class="cursor-pointer select-none" @click="ordenar('fornecedor')">Fornecedor{{ seta('fornecedor') }}</th>
+              <th class="cursor-pointer select-none" @click="ordenar('solicitante')">Solicitante{{ seta('solicitante') }}</th>
+              <th>Itens</th>
+              <th class="num cursor-pointer select-none" @click="ordenar('valor')">Valor{{ seta('valor') }}</th>
+              <th class="cursor-pointer select-none" @click="ordenar('status')">Situação{{ seta('status') }}</th>
+              <th class="cursor-pointer select-none" @click="ordenar('centro')">Centro de custo{{ seta('centro') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -172,7 +205,12 @@ function exportar() {
                   {{ data(g.data) }}
                   <div v-if="diasDesde(g.data) !== null && diasDesde(g.data)! > 0" class="text-xs text-texto-suave">há {{ diasDesde(g.data) }} d</div>
                 </td>
-                <td class="tabular-nums">{{ g.protocolo ?? '—' }}</td>
+                <td class="tabular-nums">
+                  {{ g.protocolo ?? '—' }}
+                  <div v-if="g.protocolo && ofsPorProtocolo.get(g.protocolo)" class="text-xs font-semibold text-marca-600" title="Ordem de Fornecimento gerada a partir desta solicitação">
+                    OF {{ ofsPorProtocolo.get(g.protocolo)!.join(', ') }}
+                  </div>
+                </td>
                 <td>
                   <div class="font-medium">{{ g.fornecedor }}</div>
                   <span v-if="g.codFornecedor" class="rounded-full bg-marca-100 px-2 py-0.5 text-[11px] font-bold text-marca-700" :title="`Cadastro ADM: ${g.codFornecedor}`">ADM</span>

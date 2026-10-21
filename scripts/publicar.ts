@@ -26,7 +26,7 @@ for (const arq of ['dist/index.html', 'dist/gerador.mjs']) {
   }
 }
 
-for (const p of ['gerador', 'dados/gerado', 'relatorios/entrada', 'relatorios/solicitacoes', 'relatorios/contratos']) mkdirSync(join(destino, p), { recursive: true })
+for (const p of ['gerador', 'dados/gerado', 'relatorios/entrada', 'relatorios/solicitacoes', 'relatorios/contratos', 'relatorios/ofs']) mkdirSync(join(destino, p), { recursive: true })
 
 copyFileSync('dist/index.html', join(destino, 'FUNPAR-ADM-Control.html'))
 console.log('Atualizado: FUNPAR-ADM-Control.html')
@@ -44,7 +44,7 @@ if (!existsSync(CAMINHO_INFRA)) {
 const infra = JSON.parse(readFileSync(CAMINHO_INFRA, 'utf-8')) as {
   servidor: string
   banco: string
-  views: { pagamentos: string; solicitacoes: string; contratos: string }
+  views: { pagamentos: string; solicitacoes: string; contratos: string; ofs?: string }
 }
 
 /** Origem da view no SQL Server (lida com o login do Windows de quem executa). */
@@ -58,6 +58,14 @@ const SOLICITACOES_PADRAO = {
 }
 /** Contratos dos fornecedores (vigentes) */
 const CONTRATOS_PADRAO = { nome: infra.views.contratos, arquivo: '../relatorios/contratos/contratos.csv' }
+/** Ordens de Fornecimento abertas: só as colunas usadas pelo painel (sem CPF do solicitante nem dados bancários). */
+const OFS_PADRAO = infra.views.ofs
+  ? {
+      nome: infra.views.ofs,
+      arquivo: '../relatorios/ofs/ofs.csv',
+      colunas: ['ORIGEM', 'SOLICITANTE', 'FORNEC_BENEFECIARIO', 'DATA', 'PEDIDO/OF', 'DT EMISSAO OF', 'PROC INTERNO', 'CONTRATO', 'MODALIDADE', 'PROTOCOLO', 'DESCRI', 'QUANT SOLICITADA', 'QUANT ENTREGUE', 'VALOR UNIT', 'VALOR TOTAL', 'DESC_STATUS', 'CENTRO DE CUSTO', 'CONTA_CONTABIL', 'DESC_CONTA_CONTABIL'],
+    }
+  : undefined
 
 const config = join(destino, 'gerador', 'config.json')
 if (existsSync(config)) {
@@ -66,6 +74,7 @@ if (existsSync(config)) {
     ...(atual.view ? {} : { view: VIEW_PADRAO }),
     ...(atual.solicitacoes ? {} : { solicitacoes: SOLICITACOES_PADRAO }),
     ...(atual.contratos ? {} : { contratos: CONTRATOS_PADRAO }),
+    ...(atual.ofs || !OFS_PADRAO ? {} : { ofs: OFS_PADRAO }),
   }
   if (Object.keys(faltando).length) {
     writeFileSync(config, JSON.stringify({ ...atual, ...faltando }, null, 2) + '\n')
@@ -85,6 +94,7 @@ if (existsSync(config)) {
         view: VIEW_PADRAO,
         solicitacoes: SOLICITACOES_PADRAO,
         contratos: CONTRATOS_PADRAO,
+        ...(OFS_PADRAO ? { ofs: OFS_PADRAO } : {}),
       },
       null,
       2,
@@ -165,6 +175,7 @@ if (args.local) {
     view: comArquivo(cfg.view),
     solicitacoes: comArquivo(cfg.solicitacoes),
     contratos: comArquivo(cfg.contratos),
+    ofs: comArquivo(cfg.ofs),
   }
   escreverExecutor(args.local)
   writeFileSync(join(args.local, 'config.json'), JSON.stringify(local, null, 2) + '\n')

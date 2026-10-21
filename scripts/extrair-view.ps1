@@ -5,9 +5,11 @@
                        -> relatorios\solicitacoes\solicitacoes.csv
     - "contratos":     Contratos dos fornecedores
                        -> relatorios\contratos\contratos.csv
+    - "ofs":           Ordens de Fornecimento abertas, só as colunas configuradas
+                       -> relatorios\ofs\ofs.csv
 
   Usa o login do Windows de quem executa (Integrated Security): nenhuma senha é guardada.
-  Configuração nas seções "view" e "solicitacoes" do config.json (ao lado deste script).
+  Configuração nas seções "view", "solicitacoes", "contratos" e "ofs" do config.json (ao lado deste script).
 
   Uso: powershell -NoProfile -File extrair-view.ps1 [-Config config.json]
 #>
@@ -121,6 +123,21 @@ try {
       Log "view $($c.nome) extraída: $n linhas -> $(Split-Path -Leaf $destinoCt)"
     } catch {
       Log "AVISO: não foi possível extrair os contratos: $($_.Exception.Message)"
+    }
+  }
+
+  # 4) Ordens de Fornecimento abertas — opcional; só as colunas configuradas (sem CPF nem dados bancários).
+  $o = $cfg.ofs
+  if ($null -ne $o) {
+    try {
+      Validar $o.nome '^[\w\.\[\]]+$' 'Nome de view'
+      foreach ($col in $o.colunas) { Validar $col '^[\w /]+$' 'Nome de coluna' }
+      $colunasOf = ($o.colunas | ForEach-Object { "[$_]" }) -join ', '
+      $destinoOf = Caminho $o.arquivo
+      $n = Extrair $con "SELECT $colunasOf FROM $($o.nome) ORDER BY [PEDIDO/OF], [DESCRI], [VALOR TOTAL]" @{} $destinoOf
+      Log "view $($o.nome) extraída: $n itens de OF -> $(Split-Path -Leaf $destinoOf)"
+    } catch {
+      Log "AVISO: não foi possível extrair as ordens de fornecimento: $($_.Exception.Message)"
     }
   }
 } catch {

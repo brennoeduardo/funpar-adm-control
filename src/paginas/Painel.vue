@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { lancamentosCobertos, montarMatriz, ROTULO_SITUACAO, situacaoDosTitulos, type Situacao } from '@core/situacao'
 import type { TituloVinculado } from '@core/tipos'
 import { competenciaDe, somarMeses } from '@core/util'
-import { dados, detalhe, filtrarLinhas, filtros, fornecedorPorCodigo, hoje, irPara, passaFiltroTitulo, somenteBaixados } from '../estado'
+import { dados, detalhe, filtrarLinhas, filtros, fornecedorPorCodigo, hoje, irPara, ofsParaSinalizar, passaFiltroTitulo, somenteBaixados } from '../estado'
 import { compCurta, compLonga, data, moeda } from '../formato'
 import { ESTILO_SITUACAO } from '../componentes/estilos'
 import SituacaoSelo from '../componentes/SituacaoSelo.vue'
@@ -18,7 +18,7 @@ const competencias = computed(() => {
 const linhas = computed(() => filtrarLinhas(montarMatriz(d.value, [filtros.competencia], hoje)))
 const celula = (l: (typeof linhas.value)[number]) => l.celulas[filtros.competencia]!
 const previstos = computed(() => linhas.value.filter((l) => celula(l).situacao !== 'nao_previsto'))
-const cobreLancamento = computed(() => lancamentosCobertos(filtros.competencia, d.value.coberturas))
+const cobreLancamento = computed(() => lancamentosCobertos(filtros.competencia, d.value.coberturas, hoje))
 
 const contagem = computed(() => {
   const c: Partial<Record<Situacao, number>> = {}
@@ -36,8 +36,13 @@ const titulosMes = computed(() => d.value.titulos.filter((t) => t.competencia ==
 const valorLancado = computed(() => titulosMes.value.reduce((s, t) => s + t.valor, 0))
 const valorPago = computed(() => titulosMes.value.filter((t) => t.baixa && t.saldo <= 0).reduce((s, t) => s + t.valor, 0))
 
+/** OFs abertas do fornecedor que valem para a competência, quando a nota ainda não foi lançada. */
+const ofsDe = (l: (typeof linhas.value)[number]) => ofsParaSinalizar(l.fornecedor.codigo, filtros.competencia, celula(l).situacao)
+
 /** Fornecedores da competência que ainda pedem atenção (tudo que não está pago). */
 const pendentes = computed(() => previstos.value.filter((l) => celula(l).situacao !== 'pago'))
+
+const comOF = computed(() => pendentes.value.filter((l) => ofsDe(l).length).length)
 
 /** Títulos lançados e ainda não pagos, de qualquer competência. */
 const aPagar = computed(() =>
@@ -125,21 +130,36 @@ const situacaoTitulo = (t: TituloVinculado) => situacaoDosTitulos([t], hoje)!
         </div>
       </div>
 
-      <h3 class="mt-6 mb-2 text-base font-bold">Fornecedores pendentes na competência</h3>
+      <div class="mt-6 mb-2 flex flex-wrap items-center gap-3">
+        <h3 class="text-base font-bold">Fornecedores pendentes na competência</h3>
+        <span v-if="comOF" class="rounded-full bg-destaque px-2.5 py-0.5 text-xs font-bold text-marca-700" title="Nota ainda não lançada, mas o fornecedor já tem Ordem de Fornecimento aberta">
+          {{ comOF }} {{ comOF === 1 ? 'já tem' : 'já têm' }} OF aberta
+        </span>
+      </div>
       <div class="max-h-96 overflow-auto rounded-lg border border-slate-200">
         <table class="tabela">
           <thead>
-            <tr><th>Fornecedor</th><th>Situação</th><th class="num">Títulos</th><th class="num">Valor lançado</th><th>Vencimento</th></tr>
+            <tr><th>Fornecedor</th><th>Situação</th><th>OF</th><th class="num">Títulos</th><th class="num">Valor lançado</th><th>Vencimento</th></tr>
           </thead>
           <tbody>
             <tr v-for="l in pendentes" :key="l.id" class="cursor-pointer" @click="detalhe = { tipo: 'celula', linhaId: l.id, competencia: filtros.competencia }">
               <td class="font-medium">{{ l.fornecedor.nome }}</td>
               <td><SituacaoSelo :situacao="celula(l).situacao" /></td>
+              <td>
+                <span
+                  v-for="o in ofsDe(l).slice(0, 2)"
+                  :key="o.pedido"
+                  class="mr-1 inline-block rounded-full bg-destaque px-2 py-0.5 text-xs font-bold whitespace-nowrap text-marca-700"
+                  :title="`${o.status.toLowerCase()} · emitida em ${data(o.emissao)} · ${moeda(o.valor)}`"
+                >OF {{ o.pedido }}</span>
+                <span v-if="ofsDe(l).length > 2" class="text-xs font-semibold text-marca-700" :title="ofsDe(l).slice(2).map((o) => o.pedido).join(', ')">+{{ ofsDe(l).length - 2 }}</span>
+                <span v-if="!ofsDe(l).length" class="text-texto-suave">—</span>
+              </td>
               <td class="num">{{ celula(l).titulos.length || '—' }}</td>
               <td class="num">{{ celula(l).valor ? moeda(celula(l).valor) : '—' }}</td>
               <td class="tabular-nums">{{ data(celula(l).titulos.map((t) => t.vencimentoReal).filter(Boolean).sort()[0]) }}</td>
             </tr>
-            <tr v-if="!pendentes.length"><td colspan="5" class="py-6 text-center text-texto-suave">Todos os fornecedores previstos estão lançados e pagos.</td></tr>
+            <tr v-if="!pendentes.length"><td colspan="6" class="py-6 text-center text-texto-suave">Todos os fornecedores previstos estão lançados e pagos.</td></tr>
           </tbody>
         </table>
       </div>

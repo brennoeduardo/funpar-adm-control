@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { conciliar, importarRelatorios, lerCadastros, type EstadoImportacao } from '../src/core/index'
 import { lerSolicitacoes, vincularFornecedores } from '../src/core/solicitacoes'
 import { lerContratosProtheus, resumirPagamentos } from '../src/core/contratosProtheus'
+import { lerOFs, vincularFornecedoresOF } from '../src/core/ofs'
 import { hojeISO } from '../src/core/util'
 import { arquivoRelatorio, lerBytes } from './lib/xlsx-node'
 
@@ -31,6 +32,15 @@ const configSchema = z.object({
   solicitacoes: z.object({ arquivo: z.string() }).passthrough().optional(),
   /** Contratos dos fornecedores (view de contratos), extraídos pelo extrair-view.ps1 */
   contratos: z.object({ arquivo: z.string() }).passthrough().optional(),
+  /** Ordens de Fornecimento abertas (view de OFs), extraídas pelo extrair-view.ps1 */
+  ofs: z
+    .object({
+      arquivo: z.string(),
+      /** Códigos de fornecedor cujas OFs ficam ocultas no painel (aba, selo "OF" e vínculo nas solicitações) */
+      ocultarFornecedores: z.array(z.string()).default([]),
+    })
+    .passthrough()
+    .optional(),
 })
 
 const { values: args } = parseArgs({
@@ -134,6 +144,21 @@ try {
     }
   }
 
+  // Ordens de Fornecimento abertas: retrato da última extração. O fornecedor é identificado pelo
+  // contrato (código exato, via view de contratos) ou, sem contrato conhecido, pelo nome no cadastro.
+  if (config.ofs) {
+    const caminhoOf = resolve(base, config.ofs.arquivo)
+    if (existsSync(caminhoOf)) {
+      const of = lerOFs(lerBytes(caminhoOf), caminhoOf)
+      for (const e of of.erros) log(`AVISO ordens de fornecimento: ${e}`)
+      const ocultar = new Set(config.ofs.ocultarFornecedores)
+      const todas = vincularFornecedoresOF(of.itens, dados.contratosProtheus ?? [], cadastros.fornecedores)
+      dados.ofs = todas.filter((i) => !(i.codFornecedor && ocultar.has(i.codFornecedor)))
+      dados.ofsOcultas = new Set(todas.filter((i) => !dados.ofs!.includes(i)).map((i) => i.pedido ?? i.protocolo)).size
+      dados.ofsGeradoEm = statSync(caminhoOf).mtime.toISOString()
+    }
+  }
+
   const json = JSON.stringify(dados)
   gravarAtomico(join(saida, 'dados.json'), json)
   gravarAtomico(join(saida, 'dados.js'), `window.__ADM__ = ${json};\n`)
@@ -143,7 +168,7 @@ try {
     podarHistorico()
   }
 
-  log(`ok: ${dados.titulos.length} títulos no escopo, ${dados.ignorados} ignorados, ${dados.solicitacoes?.length ?? 0} itens de solicitação, ${dados.contratosProtheus?.length ?? 0} contratos, ${resultado.pulados.length} arquivos já importados, ${cadastros.problemas.length} problemas no cadastro`)
+  log(`ok: ${dados.titulos.length} títulos no escopo, ${dados.ignorados} ignorados, ${dados.solicitacoes?.length ?? 0} itens de solicitação, ${dados.contratosProtheus?.length ?? 0} contratos, ${dados.ofs?.length ?? 0} itens de OF, ${resultado.pulados.length} arquivos já importados, ${cadastros.problemas.length} problemas no cadastro`)
 } catch (e) {
   log(`ERRO ${(e as Error).stack ?? e}`)
   process.exitCode = 1

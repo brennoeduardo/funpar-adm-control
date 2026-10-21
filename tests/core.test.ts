@@ -239,3 +239,68 @@ describe('contratos do Protheus', () => {
     expect(res).toMatchObject({ pagoNoAno: 200, titulosNoAno: 1, ultimoPagamento: '2026-09-10', aPagar: 1, valorAPagar: 300, mediaRecente: 200 })
   })
 })
+
+describe('ordens de fornecimento', () => {
+  it('lê a view, trata data 1900 como vazia e identifica o fornecedor pelo contrato ou pelo nome', async () => {
+    const { lerOFs, vincularFornecedoresOF } = await import('../src/core/ofs')
+    const csv = [
+      'ORIGEM;SOLICITANTE;FORNEC_BENEFECIARIO;DATA;PEDIDO/OF;DT EMISSAO OF;PROC INTERNO;CONTRATO;MODALIDADE;PROTOCOLO;DESCRI;QUANT SOLICITADA;QUANT ENTREGUE;VALOR UNIT;VALOR TOTAL;DESC_STATUS;CENTRO DE CUSTO;CONTA_CONTABIL;DESC_CONTA_CONTABIL',
+      'ATAS E CONTRATOS;SOLICITANTE A;EMPRESA COM CONTRATO LTDA;2026-10-01;100001;2026-10-02;;000000000000123;RP;00001111110000;SERVICO;1;0;500;500;AGUARDANDO ENTREGA;1107030005;321010300008;(-) DESP',
+      'FORMULÁRIO DE COMPRAS;SOLICITANTE B;12.345.678 FULANO DE TAL;2026-10-03;100002;1900-01-01;;;CD;00002222220000;CANETA;10;4;2;20;EM PROCESSO DE COMPRAS;1108030007;;',
+    ].join('\n')
+    const r = lerOFs(new TextEncoder().encode(csv), 'ofs.csv')
+    expect(r.itens).toHaveLength(2)
+    expect(r.itens[0]).toMatchObject({ pedido: '100001', fornecedor: 'EMPRESA COM CONTRATO LTDA', emissao: '2026-10-02', protocolo: '111111', contrato: '000000000000123' })
+    expect(r.itens[1]).toMatchObject({ pedido: '100002', emissao: null, qtdSolicitada: 10, qtdEntregue: 4, contrato: null })
+    const contratos = [{ contrato: '000000000000123', codFornecedor: '900010' }] as Parameters<typeof vincularFornecedoresOF>[1]
+    const fornecedores = [{ codigo: 'A00001', loja: '0001', cnpj: null, razaoSocial: '12.345.678 FULANO DE TAL', nome: 'FULANO DE TAL', formaPagamento: null, solicitante: null, ativo: true, observacoes: null }]
+    expect(vincularFornecedoresOF(r.itens, contratos, fornecedores).map((i) => i.codFornecedor)).toEqual(['900010', 'A00001'])
+  })
+})
+
+describe('sinalização "tem OF"', () => {
+  it('considera só OFs emitidas e não finalizadas, com emissão até o fim da competência', async () => {
+    const { ofsAbertasPorFornecedor, ofsDaCompetencia } = await import('../src/core/ofs')
+    const item = (p: Record<string, unknown>) => ({
+      pedido: '1', origem: 'ATAS E CONTRATOS', solicitante: null, fornecedor: 'X', codFornecedor: '900001', dataSolicitacao: null, emissao: '2026-10-20',
+      processo: null, contrato: null, modalidade: null, protocolo: null, descricao: null, qtdSolicitada: 1, qtdEntregue: 0, valorUnitario: 10, valorTotal: 10,
+      status: 'AGUARDANDO ENTREGA', centroCusto: null, contaContabil: null, descContaContabil: null, ...p,
+    }) as import('../src/core/tipos').ItemOF
+    const m = ofsAbertasPorFornecedor([
+      item({ pedido: '100', emissao: '2026-10-20' }),
+      item({ pedido: '100', emissao: '2026-10-20', valorTotal: 5 }),
+      item({ pedido: '101', status: 'PAGO/FINALIZADO' }),
+      item({ pedido: null, status: 'PENDENTE - APROVAÇÃO GESTOR UNIDADE' }),
+    ])
+    expect(m.get('900001')).toEqual([expect.objectContaining({ pedido: '100', valor: 15 })])
+    expect(ofsDaCompetencia(m.get('900001'), '2026-10').map((o) => o.pedido)).toEqual(['100'])
+    expect(ofsDaCompetencia(m.get('900001'), '2026-09')).toEqual([])
+  })
+})
+
+describe('mês em andamento', () => {
+  it('relatório com pagos e em aberto até hoje cobre o mês corrente: ausência vira "não lançado"', () => {
+    const cob = [{ arquivo: 'v', hash: 'h', geradoEm: '2026-10-21T10:00:00Z', importadoEm: '', layout: 'VIEW_SE2', tipo: 'misto' as const, baixaIni: '2026-01-05', baixaFim: '2026-10-21', emissaoIni: '2026-01-01', emissaoFim: '2026-10-21', linhas: 1, erros: [] }]
+    expect(situacaoCelula(true, '2026-10', [], cob, '2026-10-21')).toBe('nao_lancado')
+    // relatório parado há mais de 5 dias: o mês corrente não está coberto
+    expect(situacaoCelula(true, '2026-10', [], cob, '2026-10-30')).toBe('fora_cobertura')
+  })
+})
+
+describe('ordenação e período das tabelas', () => {
+  it('ordena crescente, inverte no segundo clique e mantém vazios no fim', async () => {
+    const { useOrdenacao, noPeriodo } = await import('../src/componentes/ordenacao')
+    type L = { d: string | null; v: number }
+    const itens: L[] = [{ d: '2026-10-02', v: 3 }, { d: null, v: 1 }, { d: '2026-09-15', v: 2 }]
+    const o = useOrdenacao<L, 'd' | 'v'>((x, c) => x[c], 'd')
+    expect(o.aplicar(itens).map((x) => x.d)).toEqual(['2026-09-15', '2026-10-02', null])
+    o.ordenar('d')
+    expect(o.aplicar(itens).map((x) => x.d)).toEqual(['2026-10-02', '2026-09-15', null])
+    o.ordenar('v')
+    expect(o.aplicar(itens).map((x) => x.v)).toEqual([1, 2, 3])
+    expect(noPeriodo('2026-10-05', '2026-10-01', '2026-10-31')).toBe(true)
+    expect(noPeriodo('2026-09-30', '2026-10-01', '')).toBe(false)
+    expect(noPeriodo(null, '', '')).toBe(true)
+    expect(noPeriodo(null, '2026-10-01', '')).toBe(false)
+  })
+})

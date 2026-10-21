@@ -33,9 +33,14 @@ export const DESCRICAO_SITUACAO: Record<Situacao, string> = {
 /** Folga (dias) nas pontas do mês: os períodos vêm das datas reais dos títulos. */
 const FOLGA_COBERTURA = 5
 
-function uniaoCobre(periodos: [string, string][], competencia: string): boolean {
+/**
+ * Os períodos importados abrangem a competência? No mês em andamento (`hoje` dentro dele),
+ * basta cobrir até hoje: o resto do mês ainda não aconteceu.
+ */
+function uniaoCobre(periodos: [string, string][], competencia: string, hoje?: string): boolean {
   const ini = inicioCompetencia(competencia)
-  const fim = fimCompetencia(competencia)
+  const fimMes = fimCompetencia(competencia)
+  const fim = hoje && hoje >= ini && hoje < fimMes ? hoje : fimMes
   const ordenados = [...periodos].sort((a, b) => a[0].localeCompare(b[0]))
   const unidos: [string, string][] = []
   for (const p of ordenados) {
@@ -50,24 +55,26 @@ function uniaoCobre(periodos: [string, string][], competencia: string): boolean 
  * Lançamentos cobertos: um relatório com títulos pagos e em aberto (filtrado pela emissão)
  * abrange o mês inteiro — então a ausência de título significa "não lançado".
  */
-export function lancamentosCobertos(competencia: string, coberturas: Cobertura[]): boolean {
+export function lancamentosCobertos(competencia: string, coberturas: Cobertura[], hoje?: string): boolean {
   return uniaoCobre(
     coberturas.filter((c) => c.tipo !== 'baixados' && c.emissaoIni && c.emissaoFim).map((c) => [c.emissaoIni!, c.emissaoFim!]),
     competencia,
+    hoje,
   )
 }
 
 /** Pagamentos cobertos: as baixas importadas abrangem o mês inteiro. */
-export function pagamentosCobertos(competencia: string, coberturas: Cobertura[]): boolean {
+export function pagamentosCobertos(competencia: string, coberturas: Cobertura[], hoje?: string): boolean {
   return uniaoCobre(
     coberturas.filter((c) => c.baixaIni && c.baixaFim).map((c) => [c.baixaIni!, c.baixaFim!]),
     competencia,
+    hoje,
   )
 }
 
 /** Mantido para compatibilidade: algum relatório permite afirmar algo sobre o mês. */
-export function competenciaCoberta(competencia: string, coberturas: Cobertura[]): boolean {
-  return lancamentosCobertos(competencia, coberturas) || pagamentosCobertos(competencia, coberturas)
+export function competenciaCoberta(competencia: string, coberturas: Cobertura[], hoje?: string): boolean {
+  return lancamentosCobertos(competencia, coberturas, hoje) || pagamentosCobertos(competencia, coberturas, hoje)
 }
 
 export function situacaoDosTitulos(titulos: Titulo[], hoje: string): Situacao | null {
@@ -98,8 +105,8 @@ export function situacaoCelula(
   if (s) return s
   if (!previsto) return 'nao_previsto'
   if (competencia > competenciaDe(hoje)!) return 'futuro'
-  if (lancamentosCobertos(competencia, coberturas)) return 'nao_lancado'
-  return pagamentosCobertos(competencia, coberturas) ? 'sem_registro' : 'fora_cobertura'
+  if (lancamentosCobertos(competencia, coberturas, hoje)) return 'nao_lancado'
+  return pagamentosCobertos(competencia, coberturas, hoje) ? 'sem_registro' : 'fora_cobertura'
 }
 
 export interface Celula {

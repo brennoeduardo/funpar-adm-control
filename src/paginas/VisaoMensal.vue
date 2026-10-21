@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { DESCRICAO_SITUACAO, ROTULO_SITUACAO } from '@core/situacao'
 import { competenciaDe } from '@core/util'
-import { anosDisponiveis, detalhe, filtrarLinhas, filtros, hoje, matrizAno } from '../estado'
+import { anosDisponiveis, detalhe, filtrarLinhas, filtros, hoje, matrizAno, ofsParaSinalizar } from '../estado'
 import { mesCurto, moeda } from '../formato'
 import { ESTILO_SITUACAO, ORDEM_SITUACAO } from '../componentes/estilos'
 
@@ -22,6 +22,11 @@ const totais = computed(() =>
     pago: linhas.value.reduce((s, l) => s + (l.celulas[c]?.valorPago ?? 0), 0),
   })),
 )
+/** Complemento do tooltip quando o fornecedor tem OF aberta e a nota ainda não foi lançada. */
+function ofsTitulo(cod: string, comp: string, situacao: Parameters<typeof ofsParaSinalizar>[2]): string {
+  const ofs = ofsParaSinalizar(cod, comp, situacao)
+  return ofs.length ? ` · TEM OF: ${ofs.map((o) => `${o.pedido} (${o.status.toLowerCase()})`).join(', ')}` : ''
+}
 const mil = (v: number) => (v ? (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—')
 </script>
 
@@ -41,6 +46,9 @@ const mil = (v: number) => (v ? (v / 1000).toLocaleString('pt-BR', { maximumFrac
         </label>
       </div>
       <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-texto-suave">
+        <span class="flex items-center gap-1.5" title="Fornecedor com Ordem de Fornecimento aberta e nota ainda não lançada na competência">
+          <span class="rounded-full bg-destaque px-1 text-[9px] font-extrabold text-marca-700">OF</span> Tem OF aberta
+        </span>
         <span v-for="s in ORDEM_SITUACAO.filter((x) => x !== 'futuro' && x !== 'nao_previsto')" :key="s" class="flex items-center gap-1.5" :title="DESCRICAO_SITUACAO[s]">
           <span
             class="inline-flex size-5 items-center justify-center rounded text-[11px] font-bold"
@@ -72,12 +80,16 @@ const mil = (v: number) => (v ? (v / 1000).toLocaleString('pt-BR', { maximumFrac
             <td v-for="c in competencias" :key="c" class="p-1 text-center" :class="c === mesAtual ? 'bg-destaque-claro' : ''">
               <button
                 v-if="l.celulas[c]!.situacao !== 'nao_previsto' && l.celulas[c]!.situacao !== 'futuro'"
-                class="inline-flex size-8 items-center justify-center rounded-md text-sm font-bold transition hover:scale-110 hover:shadow"
+                class="relative inline-flex size-8 items-center justify-center rounded-md text-sm font-bold transition hover:scale-110 hover:shadow"
                 :style="{ background: ESTILO_SITUACAO[l.celulas[c]!.situacao].fundo, color: ESTILO_SITUACAO[l.celulas[c]!.situacao].cor, border: `1px solid ${ESTILO_SITUACAO[l.celulas[c]!.situacao].cor}40` }"
-                :title="`${ROTULO_SITUACAO[l.celulas[c]!.situacao]}${l.celulas[c]!.valor ? ' · ' + moeda(l.celulas[c]!.valor) : ''}`"
+                :title="`${ROTULO_SITUACAO[l.celulas[c]!.situacao]}${l.celulas[c]!.valor ? ' · ' + moeda(l.celulas[c]!.valor) : ''}${ofsTitulo(l.fornecedor.codigo, c, l.celulas[c]!.situacao)}`"
                 @click="detalhe = { tipo: 'celula', linhaId: l.id, competencia: c }"
               >
                 {{ ESTILO_SITUACAO[l.celulas[c]!.situacao].simbolo }}<sub v-if="l.celulas[c]!.titulos.length > 1" class="text-[9px]">{{ l.celulas[c]!.titulos.length }}</sub>
+                <span
+                  v-if="ofsParaSinalizar(l.fornecedor.codigo, c, l.celulas[c]!.situacao).length"
+                  class="absolute -top-1.5 -right-2 rounded-full border border-white bg-destaque px-1 text-[9px] leading-tight font-extrabold text-marca-700 shadow"
+                >OF</span>
               </button>
               <span v-else class="text-slate-300">·</span>
             </td>
